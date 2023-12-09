@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -62,8 +63,7 @@ int calibrate(char *word_list[], int n)
         j = 0;
         while (first == -1)
         {
-           if (word_list[i][j] >= '0' &&
-               word_list[i][j] <= '9')
+           if (isdigit(word_list[i][j]))
            {
                first = word_list[i][j] - '0';
            }
@@ -72,8 +72,7 @@ int calibrate(char *word_list[], int n)
 
         while (word_list[i][j] != '\0')
         {
-           if (word_list[i][j] >= '0' &&
-               word_list[i][j] <= '9')
+           if (isdigit(word_list[i][j]))
            {
                second = word_list[i][j] - '0';
            }
