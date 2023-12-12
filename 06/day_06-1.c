@@ -37,7 +37,7 @@ char *read_line(int size)
     return str;
 }
 
-int get_win_combos(int time, int dist)
+int get_win_combos(int time, int record)
 {
     int race_dist, i;
     int combos = 0;
@@ -45,9 +45,12 @@ int get_win_combos(int time, int dist)
     for (i = 0; i < time; ++i)
     {
         race_dist = i * (time - i);
-        if (
+        if (race_dist > record)
+        {
+            ++combos;
+        }
     }
-    return 0;
+    return combos;
 }
 
 int calc(int times[], int distances[])
@@ -84,6 +87,9 @@ int main()
             &times[0], &times[1], &times[2], &times[3]);
     sscanf(lines[1], "Distance: %d %d %d %d", 
             &distances[0], &distances[1], &distances[2], &distances[3]);
+
+    int total = calc(times, distances);
+    printf("win possibilities: %d\n", total);
 
     return 0;
 }
