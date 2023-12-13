@@ -212,6 +212,8 @@ int compare_hands_v2(const void *x, const void *y)
 }
 
 /*
+ * UNUSED 
+ *
  * check if hand a is "less than" hand b
  */
 bool compare_hands(Hand a, Hand b)
@@ -243,6 +245,9 @@ bool compare_hands(Hand a, Hand b)
     return false;
 }
 
+/* 
+ * UNUSED 
+ */
 void swap_hands(Hand *a, Hand *b)
 {
     Hand tmp = *a;
@@ -251,6 +256,8 @@ void swap_hands(Hand *a, Hand *b)
 }
 
 /*
+ * UNUSED 
+ *
  * selection sort implementation
  */
 void sort_hands(Hand *hands, int n)
