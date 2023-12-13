@@ -1,3 +1,9 @@
+#include Makefiles, exclude other files with no identifier
+*
+!Makefile
+!/**/
+!*.*
+
 # Prerequisites
 *.d
 
