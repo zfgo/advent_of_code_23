@@ -177,6 +177,41 @@ int get_card_strength(char c)
 }
 
 /*
+ * comparison function for qsort(), very similar to the `compare_hands` function,
+ * but with accepting "generic" void * inputs
+ */
+int compare_hands_v2(const void *x, const void *y)
+{
+    Hand *a = (Hand *)x;
+    Hand *b = (Hand *)y;
+    int i;
+
+    if (a->type < b->type)
+    {
+        return -1;
+    }
+    else if (a->type == b->type)
+    {
+        for (i = 0; i < HAND_LEN; ++i)
+        {
+            int stren_a = get_card_strength(a->hand[i]);
+            int stren_b = get_card_strength(b->hand[i]);
+            
+            if (stren_a < stren_b)
+            {
+                return -1;
+            }
+            else if (stren_a > stren_b)
+            {
+                return 1;
+            }
+            // if the card strengths are equal, continue to the next card to check strengths
+        }
+    }
+    return 1;
+}
+
+/*
  * check if hand a is "less than" hand b
  */
 bool compare_hands(Hand a, Hand b)
@@ -270,7 +305,10 @@ int main()
 
     parse_lines(lines, hands, n);
     get_hand_types(hands, n);
-    sort_hands(hands, n);
+    //sort_hands(hands, n);
+
+    qsort(hands, n, sizeof(Hand), compare_hands_v2);    // use stdlib's built-in qsort implementation
+
     long long int winnings = calc_winnings(hands, n);
     printf("total winnings: %lld\n", winnings);
 
