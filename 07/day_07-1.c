@@ -22,7 +22,7 @@ enum hand_type
     HIGH_CARD,
     ONE_PAIR,
     TWO_PAIR,
-    SET, // three of a kind
+    THREE_KIND,
     FULL_HOUSE,
     FOUR_KIND,
     FIVE_KIND
@@ -114,7 +114,7 @@ int calc_type(Hand h)
                     return FULL_HOUSE;
                 }
             }
-            return SET; // if full house not returned, return three kind (set)
+            return THREE_KIND; // if full house not returned, return three kind (set)
         }
         else if (count[i] == 2)     // three possibilities: pair, two pair, full house
         {
