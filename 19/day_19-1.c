@@ -21,7 +21,7 @@ typedef enum cond
     NA = -1
 } Cond;
 
-typedef struct rule
+typedef struct rule     // I accidentally mixed up 'workflow' and 'rule' and didnt feel like changing things
 {
     char name[8];
     char xmas[8];
