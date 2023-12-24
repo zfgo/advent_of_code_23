@@ -24,22 +24,23 @@ typedef enum cond
 typedef struct rule
 {
     char name[8];
-    int x_i, m_i, a_i, s_i;     // counters for each rule in the workflow
-    int x[8], m[8], a[8], s[8]; // each x, m, a, s can have multiple rules in 1 workflow
-    Cond x_c[8], m_c[8], a_c[8], s_c[8]; // conditions for each rule (see the enum cond)
+    char xmas[8];
+    int val[8];
+    Cond cond[8];
+    int i;
 
     // rules: goto this rule:
     //  'A' for accepted
     //  'R' for rejected
     //  <rule->name> if another rule is needed
-    char x_r[8][8], m_r[8][8], a_r[8][8], s_r[8][8];
+    char rules[8][8];
 
     // hashes of the other rules
     //  <rule_name> : hash
     //  'A' : ACCEPTED (2049)
     //  'R' : REJECTED (2050)
     //  doesn't exist : DOES_NOT_EXIST (2051)
-    unsigned long int x_h[8], m_h[8], a_h[8], s_h[8];
+    unsigned long int rules_h[8];
     unsigned long int hash; // it might be convenient to store the workflows in 
                             // a hash table based on the name of the rule
     char base[8];    // default (or `base') rule
@@ -56,58 +57,18 @@ typedef struct part
 void print_rule(Rule *r)
 {
     printf("%s (", r->name);
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < r->i; ++i)
     {
-        if (i < r->x_i)
+        if (i == r->i - 1)
         {
-            switch (r->x_c[i])
-            {
-                case LT:
-                    printf("x<%d: %s, ", r->x[i], r->x_r[i]);
-                    break;
-                case GT:
-                    printf("x>%d: %s, ", r->x[i], r->x_r[i]);
-                    break;
-            }
+            printf("%c%c%d: %s", r->xmas[i], (r->cond[i] == LT) ? '<' : '>', 
+                    r->val[i], r->rules[i]);
+            break;
         }
-        if (i < r->m_i)
-        {
-            switch (r->m_c[i])
-            {
-                case LT:
-                    printf("m<%d: %s, ", r->m[i], r->m_r[i]);
-                    break;
-                case GT:
-                    printf("m>%d: %s, ", r->m[i], r->m_r[i]);
-                    break;
-            }
-        }
-        if (i < r->a_i)
-        {
-            switch (r->a_c[i])
-            {
-                case LT:
-                    printf("a<%d: %s, ", r->a[i], r->a_r[i]);
-                    break;
-                case GT:
-                    printf("a>%d: %s, ", r->a[i], r->a_r[i]);
-                    break;
-            }
-        }
-        if (i < r->s_i)
-        {
-            switch (r->s_c[i])
-            {
-                case LT:
-                    printf("s<%d: %s, ", r->s[i], r->s_r[i]);
-                    break;
-                case GT:
-                    printf("s>%d: %s, ", r->s[i], r->s_r[i]);
-                    break;
-            }
-        }
+        printf("%c%c%d: %s, ", r->xmas[i], (r->cond[i] == LT) ? '<' : '>', 
+                r->val[i], r->rules[i]);
     }
-    printf(") hash: %llu\n", r->hash);
+    printf(") hash: %lu\n", r->hash);
 }
 
 void print_part(Part *p)
@@ -174,19 +135,75 @@ char *read_line(int size)
 
 void parse_lines(char *lines[], int n, Rule *rule_map[], Part parts[], int *n_parts)
 {
-    int i;
+    int i, j;
+    char name[8];
+    char rules[64];
+    Rule *r;
 
     for (i = 0; lines[i][0] != '{'; ++i)
     {
-        // TODO: parse the rules, and put in the hash table
+        r = (Rule *)malloc(sizeof(Rule));
+        r->i = 0;
+
+        // scan in the line into name and rules bufs
+        sscanf(lines[i], "%[a-z]{%[a-zA-Z0-9:<>,]}", name, rules);
+        strcpy(r->name, name);  // set the rule's name
+        r->hash = oaat(name, strlen(name), NUM_BITS); // and get the rule's hash
+
+        char *tok = strtok(rules, ","); // tokenize the rules based on ","
+
+        while (tok != NULL)
+        {
+            if (strlen(tok) < 5) // this is the last instruction 
+            {                    // (minimum non-last instruction size is 5)
+                strcpy(r->base, tok);
+                r->base_h = oaat(tok, strlen(tok), NUM_BITS);
+            }
+            else
+            {
+                char ltgt;
+
+                sscanf(tok, "%c%c%d:%[a-z]", &r->xmas[r->i], &ltgt, 
+                        &r->val[r->i], r->rules[r->i]);
+                r->cond[r->i] = (ltgt == '<') ? LT : GT;
+                r->rules_h[r->i] = oaat(r->rules[r->i], strlen(r->rules[r->i]), NUM_BITS);
+                r->i++;
+            }
+            tok = strtok(NULL, ",");
+        }
+        r->next = rule_map[r->hash];
+        rule_map[r->hash] = r;
     }
-    for (i = i+1; i < n; ++i)
+                
+    for (j = 0 /* `i` is unchanged */ ; i < n; ++i, ++j)
     {
-        *n_parts++;
-        // TODO: parse the parts
+        sscanf(lines[i], "{x=%d,m=%d,a=%d,s=%d}", &parts[j].x, &parts[j].m, 
+                &parts[j].a, &parts[j].s);
     }
 
+    *n_parts = j;
+}
 
+void check_part(Rule *rule_map[], Part p, unsigned long int in_h)
+{
+
+}
+
+int calc(Rule *rule_map[], Part parts[], int n_parts)
+{
+    int total = 0;
+    int i;
+    unsigned long int in_h = oaat("in", strlen("in"), NUM_BITS);
+
+    for (i = 0; i < n_parts; ++i)
+    {
+        check_part(rule_map, parts[i], in_h);
+        if (parts[i].accepted)
+        {
+            total += (parts[i].x + parts[i].m + parts[i].a + parts[i].s);
+        }
+    }
+    return total;
 }
 
 int main()
@@ -208,6 +225,9 @@ int main()
     }
 
     parse_lines(lines, n, rule_map, parts, &n_parts);
+    int total = calc(rule_map, parts, n_parts);
+
+    printf("total of accepted parts: %d\n", total);
 
     return 0;
 }
