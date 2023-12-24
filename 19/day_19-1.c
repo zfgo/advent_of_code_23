@@ -44,7 +44,7 @@ typedef struct rule
     unsigned long int hash; // it might be convenient to store the workflows in 
                             // a hash table based on the name of the rule
     char base[8];    // default (or `base') rule
-    char base_h;     // hash of the default rule
+    unsigned long int base_h;     // hash of the default rule
     struct rule *next;
 } Rule;
 
@@ -184,9 +184,130 @@ void parse_lines(char *lines[], int n, Rule *rule_map[], Part parts[], int *n_pa
     *n_parts = j;
 }
 
-void check_part(Rule *rule_map[], Part p, unsigned long int in_h)
+bool check_rule(Cond c, int c_val, int p_val)
 {
+    switch (c)
+    {
+        case LT:
+            return p_val < c_val;
+        case GT:
+            return p_val > c_val;
+        default:
+            fprintf(stderr, "Error, in the default case in `check_rule\n");
+            return false;
+    }
+}
 
+Rule *get_rule(Rule *rule_map[], unsigned long int hash, char name[])
+{
+    Rule *r;
+    r = rule_map[hash];
+
+    while (r != NULL && strcmp(r->name, name) != 0)
+    {
+        r = r->next;
+    }
+
+    return r;
+}
+
+bool check_part_helper(Rule *cur, Part *p, int i)
+{
+    if (i == cur->i) // base case 
+    {
+        switch (cur->base_h)
+        {
+            case ACCEPTED:
+                p->accepted = true;
+                return true;
+            case REJECTED:
+                p->accepted = false;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    switch (cur->rules_h[i])
+    {
+        case ACCEPTED:
+            p->accepted = true;
+            return true;
+        case REJECTED:
+            p->accepted = false;
+            return true;
+        default:
+            return false;
+    }
+}
+
+void check_part(Rule *rule_map[], Part *p, unsigned long int in_h)
+{
+    int i;
+    Rule *cur;
+    bool stay_on_WF;
+
+    cur = rule_map[in_h];
+    while (cur != NULL && strcmp(cur->name, "in") != 0)
+    {
+        cur = cur->next;
+    }
+
+    for ( ; ; )
+    {
+        stay_on_WF = true;
+        for (i = 0; i < cur->i && stay_on_WF; ++i)
+        {
+            switch (cur->xmas[i])
+            {
+                case 'x':
+                    if (check_rule(cur->cond[i], cur->val[i], p->x))
+                    {
+                        if (check_part_helper(cur, p, i))
+                            return;
+                        cur = get_rule(rule_map, cur->rules_h[i], cur->rules[i]);
+                        stay_on_WF = false;
+                    }
+                    break;
+                case 'm':
+                    if (check_rule(cur->cond[i], cur->val[i], p->m))
+                    {
+                        if (check_part_helper(cur, p, i))
+                            return;
+                        cur = get_rule(rule_map, cur->rules_h[i], cur->rules[i]);
+                        stay_on_WF = false;
+                    }
+                    break;
+                case 'a':
+                    if (check_rule(cur->cond[i], cur->val[i], p->a))
+                    {
+                        if (check_part_helper(cur, p, i))
+                            return;
+                        cur = get_rule(rule_map, cur->rules_h[i], cur->rules[i]);
+                        stay_on_WF = false;
+                    }
+                    break;
+                case 's':
+                    if (check_rule(cur->cond[i], cur->val[i], p->s))
+                    {
+                        if (check_part_helper(cur, p, i))
+                            return;
+                        cur = get_rule(rule_map, cur->rules_h[i], cur->rules[i]);
+                        stay_on_WF = false;
+                    }
+                    break;
+            }
+            if (stay_on_WF)
+            {
+                // we have reached the base case 
+                if (check_part_helper(cur, p, i))
+                {
+                    return;
+                }
+                cur = get_rule(rule_map, cur->base_h, cur->base);
+            }
+        }
+    }
 }
 
 int calc(Rule *rule_map[], Part parts[], int n_parts)
@@ -197,7 +318,7 @@ int calc(Rule *rule_map[], Part parts[], int n_parts)
 
     for (i = 0; i < n_parts; ++i)
     {
-        check_part(rule_map, parts[i], in_h);
+        check_part(rule_map, &parts[i], in_h);
         if (parts[i].accepted)
         {
             total += (parts[i].x + parts[i].m + parts[i].a + parts[i].s);
