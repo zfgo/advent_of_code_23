@@ -59,16 +59,18 @@ void print_rule(Rule *r)
     printf("%s (", r->name);
     for (int i = 0; i < r->i; ++i)
     {
+        /*
         if (i == r->i - 1)
         {
             printf("%c%c%d: %s", r->xmas[i], (r->cond[i] == LT) ? '<' : '>', 
                     r->val[i], r->rules[i]);
             break;
         }
+        */
         printf("%c%c%d: %s, ", r->xmas[i], (r->cond[i] == LT) ? '<' : '>', 
                 r->val[i], r->rules[i]);
     }
-    printf(") hash: %lu\n", r->hash);
+    printf("base: %s) hash: %lu, n_rules: %d\n", r->base, r->hash, r->i);
 }
 
 void print_part(Part *p)
@@ -163,8 +165,9 @@ void parse_lines(char *lines[], int n, Rule *rule_map[], Part parts[], int *n_pa
             {
                 char ltgt;
 
-                sscanf(tok, "%c%c%d:%[a-z]", &r->xmas[r->i], &ltgt, 
+                sscanf(tok, "%c%c%d:%[a-zAR]", &r->xmas[r->i], &ltgt, 
                         &r->val[r->i], r->rules[r->i]);
+                //printf("%c %c %d : %s\n", r->xmas[r->i], ltgt, r->val[r->i], r->rules[r->i]);
                 r->cond[r->i] = (ltgt == '<') ? LT : GT;
                 r->rules_h[r->i] = oaat(r->rules[r->i], strlen(r->rules[r->i]), NUM_BITS);
                 r->i++;
@@ -201,6 +204,8 @@ bool check_rule(Cond c, int c_val, int p_val)
 Rule *get_rule(Rule *rule_map[], unsigned long int hash, char name[])
 {
     Rule *r;
+    if (hash > 1 << NUM_BITS)
+        printf("about to get a rule for hash %lu\n", hash);
     r = rule_map[hash];
 
     while (r != NULL && strcmp(r->name, name) != 0)
@@ -256,6 +261,8 @@ void check_part(Rule *rule_map[], Part *p, unsigned long int in_h)
     for ( ; ; )
     {
         stay_on_WF = true;
+        // print_rule(cur);
+        // print_part(p);
         for (i = 0; i < cur->i && stay_on_WF; ++i)
         {
             switch (cur->xmas[i])
@@ -297,15 +304,15 @@ void check_part(Rule *rule_map[], Part *p, unsigned long int in_h)
                     }
                     break;
             }
-            if (stay_on_WF)
+        }
+        if (stay_on_WF)
+        {
+            // we have reached the base case 
+            if (check_part_helper(cur, p, i))
             {
-                // we have reached the base case 
-                if (check_part_helper(cur, p, i))
-                {
-                    return;
-                }
-                cur = get_rule(rule_map, cur->base_h, cur->base);
+                return;
             }
+            cur = get_rule(rule_map, cur->base_h, cur->base);
         }
     }
 }
@@ -349,6 +356,25 @@ int main()
     int total = calc(rule_map, parts, n_parts);
 
     printf("total of accepted parts: %d\n", total);
+
+    int i;
+    for (i = 0; i < n; ++i)
+    {
+        free(lines[i]);
+    }
+    free(line);
+
+    Rule *r, *tmp;
+    for (i = 0; i < 1 << NUM_BITS; ++i)
+    {
+        r = rule_map[i];
+        while (r != NULL)
+        {
+            tmp = r->next;
+            free(r);
+            r = tmp;
+        }
+    }
 
     return 0;
 }
