@@ -75,6 +75,15 @@ typedef struct part
     bool accepted;
 } Part;
 
+// define the map as a global variable
+static Workflow *wf_map[1 << NUM_BITS] = {NULL};
+
+// define the ranges
+bool x[4001];
+bool m[4001];
+bool a[4001];
+bool s[4001];
+
 void print_rule(Workflow *wf)
 {
     printf("%s (", wf->name);
@@ -86,11 +95,13 @@ void print_rule(Workflow *wf)
     printf("base: %s) hash: %lu, n_rules: %d\n", wf->base, wf->hash, wf->i);
 }
 
+/*
 void print_part(Part *p)
 {
     printf("x: %d, m: %d, a: %d, s: %d, acc: %s\n", p->x, p->m, p->a, p->s, 
             p->accepted ? "true" : "false");
 }
+*/
 
 unsigned long oaat(char *key, unsigned long len, unsigned long bits) 
 {
@@ -148,7 +159,7 @@ char *read_line(int size)
     return str;
 }
 
-void parse_lines(char *lines[], int n, Workflow *wf_map[])
+void parse_lines(char *lines[])
 {
     int i;
     //int j;
@@ -189,28 +200,18 @@ void parse_lines(char *lines[], int n, Workflow *wf_map[])
         }
         wf->next = wf_map[wf->hash];
         wf_map[wf->hash] = wf;
+        //print_rule(wf);
+        //printf("wfs parsed: %d\n", i+1);
     }
 }
 
-bool check_rule(Cond c, int c_val, int p_val)
-{
-    switch (c)
-    {
-        case LT:
-            return p_val < c_val;
-        case GT:
-            return p_val > c_val;
-        default:
-            fprintf(stderr, "Error, in the default case in `check_rule\n");
-            return false;
-    }
-}
-
-Workflow *get_workflow(Workflow *wf_map[], unsigned long int hash, char name[])
+Workflow *get_workflow(unsigned long int hash, char name[])
 {
     Workflow *wf;
-    if (hash > 1 << NUM_BITS)
-        printf("about to get a rule for hash %lu\n", hash);
+    if (hash > (1 << NUM_BITS))
+    {
+        fprintf(stderr, "ERROR: about to get a rule for hash %lu\n", hash);
+    }
     wf = wf_map[hash];
 
     while (wf != NULL && strcmp(wf->name, name) != 0)
@@ -221,100 +222,53 @@ Workflow *get_workflow(Workflow *wf_map[], unsigned long int hash, char name[])
     return wf;
 }
 
-bool check_part_helper(Workflow *cur, Part *p, int i)
+typedef enum
 {
-    if (i == cur->i) // base case 
-    {
-        switch (cur->base_h)
-        {
-            case ACCEPTED:
-                p->accepted = true;
-                return true;
-            case REJECTED:
-                p->accepted = false;
-                return true;
-            default:
-                return false;
-        }
-    }
+    FALSE = 0,   // the range can NOT be trimmed to fit the condition
+    LTC,     // the range is already less than
+    GTC,     // the range is already greater than
+    LT_NT,  // the range can be less than, but it needs trimming
+    GT_NT   // the range can be greater than, but it needs trimming
+} Range_Cond;
 
-    switch (cur->wf_h[i])
-    {
-        case ACCEPTED:
-            p->accepted = true;
-            return true;
-        case REJECTED:
-            p->accepted = false;
-            return true;
-        default:
-            return false;
-    }
-}
-
-void check_part(Workflow *wf_map[], Part *p, unsigned long int in_h)
+Range_Cond check_part(Part p, char xmas, Cond c, int val)
 {
-    int i;
-    Workflow *cur;
-    bool stay_on_WF;
+    Range r;
 
-    cur = wf_map[in_h];
-    while (cur != NULL && strcmp(cur->name, "in") != 0)
+    switch (xmas)
     {
-        cur = cur->next;
+    case 'x':
+        r = p.x;
+        break;
+    case 'm':
+        r = p.m;
+        break;
+    case 'a':
+        r = p.a;
+        break;
+    case 's':
+        r = p.s;
+        break;
     }
 
-    for ( ; ; )
+    switch (c)
     {
-        stay_on_WF = true;
-        for (i = 0; i < cur->i && stay_on_WF; ++i)
-        {
-            switch (cur->xmas[i])
-            {
-                case 'x':
-                    if (check_rule(cur->cond[i], cur->val[i], p->x))
-                    {
-                        if (check_part_helper(cur, p, i))
-                            return;
-                        cur = get_workflow(wf_map, cur->wf_h[i], cur->wf[i]);
-                        stay_on_WF = false;
-                    }
-                    break;
-                case 'm':
-                    if (check_rule(cur->cond[i], cur->val[i], p->m))
-                    {
-                        if (check_part_helper(cur, p, i))
-                            return;
-                        cur = get_workflow(wf_map, cur->wf_h[i], cur->wf[i]);
-                        stay_on_WF = false;
-                    }
-                    break;
-                case 'a':
-                    if (check_rule(cur->cond[i], cur->val[i], p->a))
-                    {
-                        if (check_part_helper(cur, p, i))
-                            return;
-                        cur = get_workflow(wf_map, cur->wf_h[i], cur->wf[i]);
-                        stay_on_WF = false;
-                    }
-                    break;
-                case 's':
-                    if (check_rule(cur->cond[i], cur->val[i], p->s))
-                    {
-                        if (check_part_helper(cur, p, i))
-                            return;
-                        cur = get_workflow(wf_map, cur->wf_h[i], cur->wf[i]);
-                        stay_on_WF = false;
-                    }
-                    break;
-            }
-        }
-        if (stay_on_WF)     // we have reached the base case 
-        {
-            if (check_part_helper(cur, p, i))
-                return;
-            cur = get_workflow(wf_map, cur->base_h, cur->base);
-        }
+    case LT:
+        if (r.max < val)
+            return LTC;
+        else if (r.min < val)
+            return LT_NT;
+        break;
+    case GT:
+        if (r.min > val)
+            return GTC;
+        else if (r.max > val)
+            return GT_NT;
+        break;
+    default:
+        return FALSE;
     }
+    return FALSE;
 }
 
 void init_part(Part *p)
@@ -323,13 +277,135 @@ void init_part(Part *p)
     p->x.max = p->m.max = p->a.max = p->s.max = MAX_RATING;
 }
 
-long long int calc(Workflow *wf_map[], Part p, int n_parts, char start[])
+long long int calc_part_sum(Part p)
 {
-    long long int total = 0;
-    int i;
-    unsigned long int in_h = oaat(start, strlen(start), NUM_BITS);
+    return (p.x.max - p.x.min + 1) *
+        (p.m.max - p.m.min + 1) *
+        (p.a.max - p.a.min + 1) *
+        (p.s.max - p.s.min + 1);
+}
 
-    return total;
+typedef enum min_max 
+{
+    MIN,
+    MAX
+} Min_Max;
+
+void trim_range(Range *r, Min_Max min_max, int val)
+{
+    switch (min_max)
+    {
+    case MIN:
+        r->min = val;
+        return;
+    case MAX:
+        r->max = val;
+        return;
+    }
+}
+
+void trim_part(Part *p, char xmas, Min_Max min_max, int val)
+{
+    switch (xmas)
+    {
+    case 'x':
+        trim_range(&p->x, min_max, val);
+        return;
+    case 'm':
+        trim_range(&p->m, min_max, val);
+        return;
+    case 'a':
+        trim_range(&p->a, min_max, val);
+        return;
+    case 's':
+        trim_range(&p->s, min_max, val);
+        return;
+    }
+}
+
+void copy_range(Range *dest, Range src)
+{
+    dest->min = src.min;
+    dest->max = src.max;
+}
+
+void copy_part(Part *dest, Part src)
+{
+    copy_range(&dest->x, src.x);
+    copy_range(&dest->m, src.m);
+    copy_range(&dest->a, src.a);
+    copy_range(&dest->s, src.s);
+}
+
+long long int calc(Part p, char wf_name[], int wf_i)
+{
+    unsigned long int wf_h = oaat(wf_name, strlen(wf_name), NUM_BITS);
+    printf("CALL TO calc: wf_h hash: %lu, wf name: %s, wf_i: %d\n", 
+            wf_h, wf_name, wf_i);
+
+    if (wf_h == ACCEPTED)
+    {
+        printf("Accepted\n");
+        return calc_part_sum(p);
+    }
+    else if (wf_h == REJECTED)
+    {
+        printf("Rejected\n");
+        return 0LL;
+    }
+
+    Workflow *wf = get_workflow(wf_h, wf_name);
+
+
+    if (wf_i == wf->i)
+    {
+        if (wf->base_h == ACCEPTED)
+        {
+            printf("Accepted\n");
+            return calc_part_sum(p);
+        }
+        else if (wf->base_h == REJECTED)
+        {
+            printf("Rejected\n");
+            return 0LL;
+        }
+        else 
+            return calc(p, wf->base, 0);
+    }
+
+    Part lp, rp;
+
+    copy_part(&lp, p);
+    copy_part(&rp, p);
+
+    switch (check_part(p, wf->xmas[wf_i], wf->cond[wf_i], wf->val[wf_i]))
+    {
+    case LTC:
+        return calc(lp, wf->wf[wf_i], 0) + calc(rp, wf->name, wf_i+1);
+
+    case LT_NT:
+        trim_part(&lp, wf->xmas[wf_i], MAX, wf->val[wf_i]-1);
+        trim_part(&rp, wf->xmas[wf_i], MAX, wf->val[wf_i]);
+        return calc(lp, wf->wf[wf_i], 0) + calc(rp, wf->name, wf_i+1);
+
+    case GTC:
+        return calc(lp, wf->wf[wf_i], 0) + calc(rp, wf->name, wf_i+1);
+
+    case GT_NT:
+        trim_part(&lp, wf->xmas[wf_i], MIN, wf->val[wf_i]);
+        trim_part(&rp, wf->xmas[wf_i], MIN, wf->val[wf_i]+1);
+        return calc(lp, wf->wf[wf_i], 0) + calc(rp, wf->name, wf_i+1);
+
+    case FALSE:
+        printf("False path\n");
+        return 0LL; // it is impossible to go down this path
+    }
+    // TODO: check the condition. If the condition is already true, no need 
+    // to trim the range. If the condition is false, and we can trim the range,
+    // then trim the range, and do the recursive call for the left and the 
+    // right ranges. Otherwise, ???
+
+    return 0LL;
 }
 
 int main()
@@ -337,7 +413,6 @@ int main()
     char *line;
     char *lines[1024];
     int n = 0;
-    static Workflow *wf_map[1 << NUM_BITS] = {NULL};
     Part p;
 
     line = read_line(WORD_LENGTH);
@@ -348,11 +423,11 @@ int main()
         ++n;
     }
 
-    parse_lines(lines, n, wf_map);
+    parse_lines(lines);
     init_part(&p);
-    int total = calc(wf_map, p, "in");
+    long long int total = calc(p, "in", 0);
 
-    printf("total of accepted parts: %d\n", total);
+    printf("total of accepted parts: %lld\n", total);
 
     int i;
     for (i = 0; i < n; ++i)
